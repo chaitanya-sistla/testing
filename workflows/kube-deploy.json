@@ -1,0 +1,41 @@
+{
+  "name": "kube deploy",
+  "description": "",
+  "triggerType": "webhook",
+  "cronExpression": null,
+  "scheduledAt": null,
+  "timezone": null,
+  "isActive": true,
+  "tags": [],
+  "dagConfig": {
+    "edges": [],
+    "nodes": [
+      {
+        "position": {
+          "x": 193.51276573415367,
+          "y": 13.334654277057723
+        },
+        "stepId": "a59dd636-d486-44f8-a719-06e1864bf834"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "id": "a59dd636-d486-44f8-a719-06e1864bf834",
+      "stepKey": "kubernetes_deploy_1769543642470",
+      "name": "Kubernetes Deployment",
+      "description": "",
+      "order": 0,
+      "stepType": "kubernetes_deploy",
+      "stepConfig": {
+        "autoApprove": true,
+        "projectId": "cc345b2d-a937-4c7e-8c61-3ec294fc6d02"
+      },
+      "onError": "fail",
+      "retryConfig": null,
+      "timeoutSeconds": 0
+    }
+  ],
+  "exportedAt": "2026-02-26T06:23:03.748Z",
+  "version": "1.0"
+}
