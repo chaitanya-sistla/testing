@@ -1,50 +1,94 @@
 #------------------------------------------------------------------------------
-# Region Configuration
+# EC2 Instance Configuration
 #------------------------------------------------------------------------------
-variable "region" {
-  description = "AWS region for deployment"
+
+variable "project_name" {
+  description = "Name of the project (used for resource naming)"
   type        = string
-  default     = "us-west-2"
 }
 
-#------------------------------------------------------------------------------
-# Instance Configuration
-#------------------------------------------------------------------------------
+variable "conversation_id" {
+  description = "ops0 conversation ID (used for resource tracking)"
+  type        = string
+}
+
+variable "ami_id" {
+  description = "AMI ID for the EC2 instance"
+  type        = string
+}
+
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t3.medium"
 
   validation {
-    condition     = can(regex("^t[2-3]\\.(nano|micro|small|medium)", var.instance_type))
-    error_message = "Instance type must be a small burstable instance (t2/t3 nano, micro, small, or medium)."
+    condition     = !can(regex("^(p2\\.|p3\\.|p4\\.|g4\\.)", var.instance_type))
+    error_message = "GPU instance types (p2, p3, p4, g4) are not allowed without approval."
   }
+}
+
+variable "key_name" {
+  description = "Name of the SSH key pair"
+  type        = string
+}
+
+variable "enable_detailed_monitoring" {
+  description = "Enable detailed CloudWatch monitoring"
+  type        = bool
+  default     = true
+}
+
+variable "root_volume_type" {
+  description = "Type of root volume (gp3, gp2, io1, io2)"
+  type        = string
+  default     = "gp3"
+}
+
+variable "root_volume_size" {
+  description = "Size of root volume in GB"
+  type        = number
+  default     = 20
 }
 
 #------------------------------------------------------------------------------
 # Network Configuration
 #------------------------------------------------------------------------------
-variable "allowed_ssh_cidr" {
-  description = "CIDR block allowed to SSH to the instance (update with your IP range)"
-  type        = string
-  default     = "10.0.0.0/16"
 
-  validation {
-    condition     = can(cidrhost(var.allowed_ssh_cidr, 0))
-    error_message = "Must be a valid IPv4 CIDR block."
-  }
+variable "vpc_id" {
+  description = "ID of the VPC"
+  type        = string
+}
+
+variable "subnet_id" {
+  description = "ID of the subnet to launch the instance in"
+  type        = string
+}
+
+variable "ssh_cidr_block" {
+  description = "CIDR block allowed to SSH into the instance (replace with your IP)"
+  type        = string
+  default     = "10.0.0.0/8"
+}
+
+variable "http_cidr_block" {
+  description = "CIDR block allowed to access HTTP port"
+  type        = string
+  default     = "10.0.0.0/8"
+}
+
+variable "https_cidr_block" {
+  description = "CIDR block allowed to access HTTPS port"
+  type        = string
+  default     = "10.0.0.0/8"
 }
 
 #------------------------------------------------------------------------------
-# ops0 Configuration
+# Tags
 #------------------------------------------------------------------------------
-variable "project_name" {
-  description = "Name of the ops0 project (used for secret naming)"
-  type        = string
-  default     = "oracle-test"
-}
 
-variable "conversation_id" {
-  description = "ops0 conversation ID for resource tracking"
-  type        = string
+variable "additional_tags" {
+  description = "Additional tags to apply to resources"
+  type        = map(string)
+  default     = {}
 }
