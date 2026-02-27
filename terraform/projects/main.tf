@@ -1,42 +1,67 @@
 #------------------------------------------------------------------------------
-# Provider Configurationssssssrrrrrrrroooooooooooo
+# EC2 Instance
 #------------------------------------------------------------------------------
-provider "aws" {
-  region = var.region
-}
 
-#------------------------------------------------------------------------------
-# Data Sources
-#------------------------------------------------------------------------------
-data "aws_ami" "amazon_linux_2" {
-  most_recent = true
-  owners      = ["amazon"]
+resource "aws_instance" "web_server" {
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = var.subnet_id
+  vpc_security_group_ids = [aws_security_group.web_server.id]
+  key_name               = var.key_name
 
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  monitoring = var.enable_detailed_monitoring
+
+  root_block_device {
+    volume_type           = var.root_volume_type
+    volume_size           = var.root_volume_size
+    delete_on_termination = true
+    encrypted             = true
   }
 
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
+  tags = merge(
+    {
+      Name       = "${var.project_name}-web-server"
+      ManagedBy  = "ops0"
+      ManagedIaC = "terraform"
+    },
+    var.additional_tags
+  )
 }
 
 #------------------------------------------------------------------------------
 # Security Group
 #------------------------------------------------------------------------------
-resource "aws_security_group" "oracle_test" {
-  name        = "oracle-test-sg"
-  description = "Security group for oracle-test instance"
 
-  # SSH access from restricted CIDR (update with your IP range)
+resource "aws_security_group" "web_server" {
+  name_prefix = "${var.project_name}-web-server-"
+  description = "Security group for web server"
+  vpc_id      = var.vpc_id
+
+  # SSH access from specified CIDR
   ingress {
-    description = "SSH from restricted network"
+    description = "SSH access"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
+    cidr_blocks = [var.ssh_cidr_block]
+  }
+
+  # HTTP access from specified CIDR
+  ingress {
+    description = "HTTP access"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = [var.http_cidr_block]
+  }
+
+  # HTTPS access from specified CIDR
+  ingress {
+    description = "HTTPS access"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.https_cidr_block]
   }
 
   # Allow all outbound traffic
@@ -49,31 +74,12 @@ resource "aws_security_group" "oracle_test" {
   }
 
   tags = {
-    Name       = "oracle-test-sg"
+    Name       = "${var.project_name}-web-server-sg"
     ManagedBy  = "ops0"
     ManagedIaC = "terraform"
   }
-}
 
-#------------------------------------------------------------------------------
-# EC2 Instance
-#------------------------------------------------------------------------------
-resource "aws_instance" "oracle_test" {
-  ami           = data.aws_ami.amazon_linux_2.id
-  instance_type = var.instance_type
-  key_name      = aws_key_pair.oracle_test.key_name
-
-  vpc_security_group_ids = [aws_security_group.oracle_test.id]
-
-  root_block_device {
-    volume_size = 8
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  tags = {
-    Name       = "oracle-test"
-    ManagedBy  = "ops0"
-    ManagedIaC = "terraform"
+  lifecycle {
+    create_before_destroy = true
   }
 }
