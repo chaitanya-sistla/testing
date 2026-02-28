@@ -1,14 +1,16 @@
-# AWS Region Configuration
-region = "us-west-2"
+# IAM Role and Policy Configuration
+role_name   = "ops0-read-only-role"
+policy_name = "ops0-read-only-policy"
 
-# EC2 Instance Configuration
-instance_type = "t3.micro"
+# Trusted services that can assume the role
+trusted_services = [
+  "ec2.amazonaws.com",
+  "lambda.amazonaws.com"
+]
 
-# SSH Configuration
-# IMPORTANT: Update this with your actual IP address or CIDR block
-# Example: "203.0.113.45/32" for a single IP
-allowed_ssh_cidr = "10.0.0.0/16"
+# Optional: Add AWS account ARNs that can assume the role
+# trusted_principals = ["arn:aws:iam::123456789012:root"]
+trusted_principals = []
 
 # ops0 Configuration
-project_name    = "oracle-test"
-conversation_id = "a18c1b41-c36f-42c8-bbd1-72d4824dfcdc"
+conversation_id = "03c34051-0a79-43df-b200-3730fada7fee"
