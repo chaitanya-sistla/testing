@@ -1,8 +1,7 @@
-#pukisyuitesting
 terraform {
   backend "s3" {
-    bucket                      = "bucket-20260224-1534"
-    key                         = "oracle/terraform.tfstate"
+    bucket                      = "bucket-20260227-1431"
+    key                         = "product/tofu.tfstate"
     region                      = "us-sanjose-1"
     endpoint                    = "https://axib01nrrzob.compat.objectstorage.us-sanjose-1.oraclecloud.com"
     skip_region_validation      = true
