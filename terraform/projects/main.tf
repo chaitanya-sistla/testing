@@ -1,79 +1,95 @@
 #------------------------------------------------------------------------------
-# Provider Configurationssssssrrrrrrrroooooooooooo
+# IAM Role
 #------------------------------------------------------------------------------
-provider "aws" {
-  region = var.region
-}
 
-#------------------------------------------------------------------------------
-# Data Sources
-#------------------------------------------------------------------------------
-data "aws_ami" "amazon_linux_2" {
-  most_recent = true
-  owners      = ["amazon"]
+resource "aws_iam_role" "read_only" {
+  name        = "${var.role_name}"
+  description = "IAM role with read-only access to AWS resources"
 
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-#------------------------------------------------------------------------------
-# Security Group
-#------------------------------------------------------------------------------
-resource "aws_security_group" "oracle_test" {
-  name        = "oracle-test-sg"
-  description = "Security group for oracle-test instance"
-
-  # SSH access from restricted CIDR (update with your IP range)
-  ingress {
-    description = "SSH from restricted network"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # Allow all outbound traffic
-  egress {
-    description = "Allow all outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = var.trusted_services
+          AWS     = var.trusted_principals
+        }
+      }
+    ]
+  })
 
   tags = {
-    Name       = "oracle-test-sg"
+    Name       = var.role_name
     ManagedBy  = "ops0"
-    ManagedIaC = "terraform"
+    ManagedIaC = "opentofu"
   }
 }
 
 #------------------------------------------------------------------------------
-# EC2 Instance
+# IAM Policy - Read Only Access
 #------------------------------------------------------------------------------
-resource "aws_instance" "oracle_test" {
-  ami           = data.aws_ami.amazon_linux_2.id
-  instance_type = var.instance_type
-  key_name      = aws_key_pair.oracle_test.key_name
 
-  vpc_security_group_ids = [aws_security_group.oracle_test.id]
+resource "aws_iam_policy" "read_only" {
+  name        = "${var.policy_name}"
+  description = "Policy granting read-only access to AWS resources"
 
-  root_block_device {
-    volume_size = 8
-    volume_type = "gp3"
-    encrypted   = true
-  }
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          # EC2 Read-Only
+          "ec2:Describe*",
+          "ec2:Get*",
+          "ec2:List*",
+          # S3 Read-Only
+          "s3:Get*",
+          "s3:List*",
+          # RDS Read-Only
+          "rds:Describe*",
+          "rds:List*",
+          # Lambda Read-Only
+          "lambda:Get*",
+          "lambda:List*",
+          # CloudWatch Read-Only
+          "cloudwatch:Describe*",
+          "cloudwatch:Get*",
+          "cloudwatch:List*",
+          "logs:Describe*",
+          "logs:Get*",
+          "logs:List*",
+          # IAM Read-Only
+          "iam:Get*",
+          "iam:List*",
+          # VPC Read-Only
+          "vpc:Describe*",
+          "vpc:Get*",
+          "vpc:List*",
+          # CloudFormation Read-Only
+          "cloudformation:Describe*",
+          "cloudformation:Get*",
+          "cloudformation:List*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 
   tags = {
-    Name       = "oracle-test"
+    Name       = var.policy_name
     ManagedBy  = "ops0"
-    ManagedIaC = "terraform"
+    ManagedIaC = "opentofu"
   }
+}
+
+#------------------------------------------------------------------------------
+# Policy Attachment
+#------------------------------------------------------------------------------
+
+resource "aws_iam_role_policy_attachment" "read_only" {
+  role       = aws_iam_role.read_only.name
+  policy_arn = aws_iam_policy.read_only.arn
 }
