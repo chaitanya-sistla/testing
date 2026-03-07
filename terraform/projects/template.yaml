@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 bucket with no public access
+Description: S3 bucket with full public access
 
 Parameters:
   Environment:
@@ -29,15 +29,28 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
           Value: ops0
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${S3Bucket.Arn}/*'
 
 Outputs:
   BucketName:
@@ -51,3 +64,7 @@ Outputs:
     Value: !GetAtt S3Bucket.Arn
     Export:
       Name: !Sub '${AWS::StackName}-BucketArn'
+
+  BucketURL:
+    Description: Public URL of the S3 bucket
+    Value: !Sub 'https://${S3Bucket}.s3.amazonaws.com'
