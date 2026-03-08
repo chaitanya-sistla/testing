@@ -2,6 +2,20 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: EKS Cluster v1.28 with VPC and managed node group
 
 Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+  ProjectName:
+    Type: String
+    Default: my-eks-project
+    Description: Project name for resource tagging
+
   ClusterName:
     Type: String
     Default: my-eks-cluster
@@ -14,25 +28,74 @@ Parameters:
 
   NodeGroupInstanceType:
     Type: String
-    Default: t3.medium
+    Default: m7gd.4xlarge
     Description: EC2 instance type for worker nodes
 
   NodeGroupDesiredSize:
     Type: Number
-    Default: 2
+    Default: 3
     Description: Desired number of worker nodes
 
   NodeGroupMinSize:
     Type: Number
-    Default: 1
+    Default: 3
     Description: Minimum number of worker nodes
 
   NodeGroupMaxSize:
     Type: Number
-    Default: 4
+    Default: 6
     Description: Maximum number of worker nodes
 
+  AllowedSSHCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block allowed for SSH access (default VPC only)
+
 Resources:
+  # KMS Key for EKS Secrets Encryption
+  EKSEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS key for EKS cluster secrets encryption
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow EKS to use the key
+            Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action:
+              - 'kms:Decrypt'
+              - 'kms:DescribeKey'
+              - 'kms:CreateGrant'
+            Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ClusterName}-encryption-key'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  EKSEncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${ClusterName}-encryption'
+      TargetKeyId: !Ref EKSEncryptionKey
+
   # VPC
   VPC:
     Type: AWS::EC2::VPC
@@ -43,6 +106,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-vpc'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # Internet Gateway
   InternetGateway:
@@ -51,6 +124,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-igw'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   VPCGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -71,6 +154,16 @@ Resources:
           Value: !Sub '${ClusterName}-public-subnet-1'
         - Key: kubernetes.io/role/elb
           Value: 1
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -84,6 +177,16 @@ Resources:
           Value: !Sub '${ClusterName}-public-subnet-2'
         - Key: kubernetes.io/role/elb
           Value: 1
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # Private Subnets
   PrivateSubnet1:
@@ -97,6 +200,16 @@ Resources:
           Value: !Sub '${ClusterName}-private-subnet-1'
         - Key: kubernetes.io/role/internal-elb
           Value: 1
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
@@ -109,6 +222,16 @@ Resources:
           Value: !Sub '${ClusterName}-private-subnet-2'
         - Key: kubernetes.io/role/internal-elb
           Value: 1
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # NAT Gateway
   NatGatewayEIP:
@@ -116,6 +239,19 @@ Resources:
     DependsOn: VPCGatewayAttachment
     Properties:
       Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ClusterName}-nat-eip'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   NatGateway:
     Type: AWS::EC2::NatGateway
@@ -125,6 +261,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-nat'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # Route Tables
   PublicRouteTable:
@@ -134,6 +280,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-public-rt'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   PublicRoute:
     Type: AWS::EC2::Route
@@ -162,6 +318,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-private-rt'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   PrivateRoute:
     Type: AWS::EC2::Route
@@ -182,7 +348,7 @@ Resources:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateRouteTable
 
-  # EKS Cluster Security Group
+  # EKS Cluster Security Group - Restricted ingress
   ClusterSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -192,8 +358,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: 0.0.0.0/0
-          Description: Allow HTTPS access from anywhere
+          CidrIp: 10.0.0.0/16
+          Description: Allow HTTPS access from VPC only
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -201,6 +367,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-cluster-sg'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # Security group rule for nodes to communicate with cluster API
   ClusterSecurityGroupIngressFromNodes:
@@ -213,7 +389,7 @@ Resources:
       ToPort: 443
       Description: Allow nodes to communicate with cluster API
 
-  # Node Security Group
+  # Node Security Group - Restricted ingress (no 0.0.0.0/0 on SSH, HTTP, HTTPS, NodePorts)
   NodeSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -223,23 +399,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
-          Description: Allow SSH from anywhere
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-          Description: Allow HTTP from anywhere
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-          Description: Allow HTTPS from anywhere
-        - IpProtocol: tcp
-          FromPort: 30000
-          ToPort: 32767
-          CidrIp: 0.0.0.0/0
-          Description: Allow NodePort services from anywhere
+          CidrIp: !Ref AllowedSSHCIDR
+          Description: Allow SSH from specified CIDR only
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -249,6 +410,16 @@ Resources:
           Value: !Sub '${ClusterName}-node-sg'
         - Key: !Sub 'kubernetes.io/cluster/${ClusterName}'
           Value: owned
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   NodeSecurityGroupIngressFromCluster:
     Type: AWS::EC2::SecurityGroupIngress
@@ -293,6 +464,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-cluster-role'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # IAM Role for EKS Node Group
   EKSNodeRole:
@@ -312,8 +493,18 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ClusterName}-node-role'
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
-  # EKS Cluster
+  # EKS Cluster with Secrets Encryption
   EKSCluster:
     Type: AWS::EKS::Cluster
     Properties:
@@ -330,9 +521,24 @@ Resources:
           - !Ref PublicSubnet2
         EndpointPublicAccess: true
         EndpointPrivateAccess: true
+      EncryptionConfig:
+        - Provider:
+            KeyArn: !GetAtt EKSEncryptionKey.Arn
+          Resources:
+            - secrets
       Tags:
         - Key: Name
           Value: !Ref ClusterName
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # EKS Node Group
   EKSNodeGroup:
@@ -353,6 +559,11 @@ Resources:
         - !Ref NodeGroupInstanceType
       Tags:
         Name: !Sub '${ClusterName}-node'
+        ManagedBy: ops0
+        ManagedIaC: cloudformation
+        ops0:conversationID: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
 
 Outputs:
   ClusterName:
@@ -384,3 +595,9 @@ Outputs:
     Value: !Ref EKSNodeGroup
     Export:
       Name: !Sub '${AWS::StackName}-NodeGroupName'
+
+  EncryptionKeyArn:
+    Description: KMS Key ARN for EKS secrets encryption
+    Value: !GetAtt EKSEncryptionKey.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EncryptionKeyArn'
