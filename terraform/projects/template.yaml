@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 bucket with full public access
+Description: S3 bucket with security best practices and access logging
 
 Parameters:
   Environment:
@@ -11,14 +11,71 @@ Parameters:
       - prod
     Description: Environment name
 
+  ProjectName:
+    Type: String
+    Default: my-app
+    Description: Project name for resource tagging
+
   BucketNamePrefix:
     Type: String
     Default: my-app
     Description: Prefix for the S3 bucket name
 
 Resources:
+  # Logging Bucket for S3 Access Logs
+  LoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketNamePrefix}-logs-${Environment}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldLogs
+            Status: Enabled
+            ExpirationInDays: 90
+      Tags:
+        - Key: ManagedBy
+          Value: ops0
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LoggingBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3ServerAccessLogsPolicy
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action: 's3:PutObject'
+            Resource: !Sub '${LoggingBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref AWS::AccountId
+
+  # Main S3 Bucket with Security Best Practices
   S3Bucket:
     Type: AWS::S3::Bucket
+    DependsOn: LoggingBucket
     DeletionPolicy: Retain
     Properties:
       BucketName: !Sub '${BucketNamePrefix}-${Environment}-${AWS::AccountId}'
@@ -29,28 +86,31 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: access-logs/
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 90
       Tags:
-        - Key: Environment
-          Value: !Ref Environment
         - Key: ManagedBy
           Value: ops0
-
-  BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref S3Bucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: PublicReadGetObject
-            Effect: Allow
-            Principal: '*'
-            Action: 's3:GetObject'
-            Resource: !Sub '${S3Bucket.Arn}/*'
+        - Key: ManagedIaC
+          Value: cloudformation
+        - Key: ops0:conversationID
+          Value: '2739a1ae-7d64-4de3-b300-c257160c3263'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
 Outputs:
   BucketName:
@@ -65,6 +125,14 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-BucketArn'
 
-  BucketURL:
-    Description: Public URL of the S3 bucket
-    Value: !Sub 'https://${S3Bucket}.s3.amazonaws.com'
+  LoggingBucketName:
+    Description: Name of the logging S3 bucket
+    Value: !Ref LoggingBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-LoggingBucketName'
+
+  LoggingBucketArn:
+    Description: ARN of the logging S3 bucket
+    Value: !GetAtt LoggingBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LoggingBucketArn'
