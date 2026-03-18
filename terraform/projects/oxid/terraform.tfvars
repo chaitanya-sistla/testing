@@ -18,7 +18,7 @@ availability_zones = ["ap-south-1a", "ap-south-1b"]
 
 # EKS Cluster Configuration
 cluster_name       = "my-eks-cluster"
-kubernetes_version = "1.28"
+kubernetes_version = "1.31"
 cluster_log_types  = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
 # EKS Node Group Configuration
