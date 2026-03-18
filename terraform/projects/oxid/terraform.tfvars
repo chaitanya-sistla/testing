@@ -25,5 +25,5 @@ cluster_log_types  = ["api", "audit", "authenticator", "controllerManager", "sch
 node_instance_type = "t3.small"
 node_disk_size     = 20
 node_desired_size  = 3
-node_min_size      = 1
+node_min_size      = 3
 node_max_size      = 5
